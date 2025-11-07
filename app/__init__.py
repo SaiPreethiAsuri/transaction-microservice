@@ -7,6 +7,8 @@ from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram
 import logging
 from pythonjsonlogger import jsonlogger
+from flask_restful import Api, Resource
+from flasgger import Swagger, swag_from
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +31,14 @@ def create_app():
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///transactions.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Swagger configuration
+    app.config['SWAGGER'] = {
+        'title': 'Transaction Microservice API',
+        'uiversion': 3,
+        "specs_route": "/"
+    }
+    Swagger(app)
     
     # Initialize database with app
     db.init_app(app)

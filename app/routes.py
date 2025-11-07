@@ -12,6 +12,90 @@ main = Blueprint('main', __name__)
 # Route to create transaction
 @main.route('/transactions', methods=['POST'])
 def create_transaction():
+    """
+    Create a new transaction.
+    This endpoint creates a new transaction. For 'transfer' type, it creates two transaction records (a withdrawal and a deposit).
+    It supports idempotency via a `correlation_id` in the request body.
+    ---
+    tags:
+      - Transactions
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - amount
+            - txn_type
+          properties:
+            account_id:
+              type: integer
+              description: The ID of the account initiating the transaction.
+            counterparty_id:
+              type: string
+              description: The ID of the counterparty account (required for transfers).
+            amount:
+              type: number
+              format: float
+              description: The transaction amount.
+            txn_type:
+              type: string
+              description: The type of transaction (e.g., 'deposit', 'withdrawal', 'transfer').
+            reference:
+              type: string
+              description: A client-provided reference for the transaction.
+            correlation_id:
+              type: string
+              description: A unique ID for ensuring idempotency of the request.
+    responses:
+      201:
+        description: Transaction created successfully.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            txn_id:
+              type: integer
+              description: The ID of the created transaction (for non-transfers).
+            withdrawal_txn_id:
+              type: integer
+              description: The ID of the withdrawal part of a transfer.
+            deposit_txn_id:
+              type: integer
+              description: The ID of the deposit part of a transfer.
+      400:
+        description: Bad Request - Missing required fields, invalid amount, or other validation errors.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      409:
+        description: Conflict - Duplicate transaction based on correlation_id and request payload.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            original_txn_id:
+              type: integer
+      500:
+        description: Internal Server Error.
+        schema:
+          type: object
+          properties:
+            error: 
+              type: string
+      502:
+        description: Bad Gateway - Error communicating with a downstream service.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     # Ensure request data is read before using it
     data = request.get_json() or {}
     start_time = time.time()
@@ -159,7 +243,6 @@ def create_transaction():
                     request_hash=request_hash
                 )
                 db.session.add(idempotency)
-
             db.session.commit()
 
             # Update metrics for both records
@@ -239,6 +322,41 @@ def create_transaction():
 # Route to fetch all transactions
 @main.route('/transactions', methods=['GET'])
 def get_transactions():
+    """
+    Get all transactions.
+    This endpoint retrieves a list of all transactions in the system.
+    ---
+    tags:
+      - Transactions
+    responses:
+      200:
+        description: A list of transactions.
+        schema:
+          type: array
+          items:
+            $ref: '#/definitions/Transaction'
+      500:
+        description: Internal Server Error.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    definitions:
+      Transaction:
+        type: object
+        properties:
+          # Define transaction properties here for schema
+          txn_id: { type: integer }
+          account_id: { type: integer }
+          counterparty_id: { type: string }
+          amount: { type: number, format: float }
+          txn_type: { type: string }
+          reference: { type: string }
+          created_dt: { type: string, format: 'date-time' }
+          failure_status: { type: string }
+          correlation_id: { type: string }
+    """
     try:
         transactions = Transaction.query.all()
         return jsonify([{
@@ -259,6 +377,33 @@ def get_transactions():
 # Route to fetch specific transaction by id
 @main.route('/transactions/<int:txn_id>', methods=['GET'])
 def get_transaction(txn_id):
+    """
+    Get a specific transaction by its ID.
+    This endpoint retrieves the details of a single transaction.
+    ---
+    tags:
+      - Transactions
+    parameters:
+      - name: txn_id
+        in: path
+        type: integer
+        required: true
+        description: The unique ID of the transaction.
+    responses:
+      200:
+        description: The transaction details.
+        schema:
+          $ref: '#/definitions/Transaction'
+      404:
+        description: Transaction not found.
+      500:
+        description: Internal Server Error.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         transaction = Transaction.query.get_or_404(txn_id)
         return jsonify({
