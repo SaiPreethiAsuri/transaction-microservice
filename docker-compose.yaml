@@ -1,0 +1,14 @@
+services:
+  transaction-microservice:
+    build: .
+    container_name: transaction-microservice
+    restart: always
+    environment:
+      FLASK_ENV: development
+      SECRET_KEY: secret_key_example
+      SQLALCHEMY_DATABASE_URI: sqlite:////app/instance/transactions.db
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app:/app/app
+      - ./instance:/app/instance

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-microservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transaction-microservice
+  template:
+    metadata:
+      labels:
+        app: transaction-microservice
+    spec:
+      containers:
+      - name: transaction-microservice
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_ENV
+          value: "development"
+        - name: SECRET_KEY
+          value: "secret_key_example"
+        - name: SQLALCHEMY_DATABASE_URI
+          value: "sqlite:////app/instance/transactions.db"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: db-storage
+          mountPath: /app/instance
+      volumes:
+      - name: db-storage
+        emptyDir: {}

@@ -1,0 +1,57 @@
+{
+  "info": {
+    "_postman_id": "b1e2c7e0-7b2a-4c2a-8e2e-transaction-microservice",
+    "name": "Transaction Microservice",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Transaction",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"txn_id\": 1,\n  \"account_id\": 123,\n  \"counterparty_id\": \"abc\",\n  \"amount\": 100.0,\n  \"txn_type\": \"transfer\",\n  \"reference\": \"REF123\",\n  \"created_dt\": \"2025-11-06T12:00:00\",\n  \"correlation_id\": \"uuid-example\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/transactions",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["transactions"]
+        }
+      }
+    },
+    {
+      "name": "Get All Transactions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/transactions",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["transactions"]
+        }
+      }
+    },
+    {
+      "name": "Get Transaction by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/transactions/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["transactions", "1"]
+        }
+      }
+    }
+  ]
+}
