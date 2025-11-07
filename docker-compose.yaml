@@ -7,6 +7,8 @@ services:
       FLASK_ENV: development
       SECRET_KEY: secret_key_example
       SQLALCHEMY_DATABASE_URI: sqlite:////app/instance/transactions.db
+      ACCOUNTS_SERVICE_URL: http://accounts-microservice/accounts/check
+      NOTIFICATION_SERVICE_URL: http://notification-microservice/notify
     ports:
       - "5000:5000"
     volumes:

@@ -5,6 +5,7 @@ import requests
 import hashlib
 import json
 import time
+import os
 
 main = Blueprint('main', __name__)
 
@@ -17,6 +18,10 @@ def create_transaction():
 
     from datetime import datetime, timedelta
     DAILY_LIMIT = 200000
+
+    # Fetch external service URLs from environment variables
+    ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-microservice/accounts/check")
+    NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-microservice/notify")
 
     # Minimal required fields
     if 'amount' not in data or 'txn_type' not in data:
@@ -83,7 +88,8 @@ def create_transaction():
         if not account_id or not counterparty_id:
             return jsonify({'error': 'account_id and counterparty_id required for transfer'}), 400
 
-        accounts_service_url = "http://accounts-microservice/accounts/check"
+        # Use ACCOUNTS_SERVICE_URL from env
+        accounts_service_url = ACCOUNTS_SERVICE_URL
 
         # Validate account/counterparty status and balance (no overdraft allowed)
         try:
@@ -160,6 +166,18 @@ def create_transaction():
             current_app.transactions_total.labels(txn_type='withdrawal').inc()
             current_app.transactions_total.labels(txn_type='deposit').inc()
 
+            # Notify external notification service for both transactions
+            for tx in [withdrawal, deposit]:
+                try:
+                    notification_payload = {
+                        "txn_id": tx.txn_id or tx.id,
+                        "reference": tx.reference,
+                        "status": "success"
+                    }
+                    requests.post(NOTIFICATION_SERVICE_URL, json=notification_payload, timeout=3)
+                except Exception as notify_err:
+                    current_app.logger.warning(f"Notification service call failed for txn_id {tx.txn_id or tx.id}: {notify_err}")
+
             return jsonify({
                 'message': 'Transfer completed',
                 'withdrawal_txn_id': withdrawal.txn_id or withdrawal.id,
@@ -196,6 +214,17 @@ def create_transaction():
         
         # Business metric: increment total transactions
         current_app.transactions_total.labels(txn_type=txn.txn_type or 'unknown').inc()
+
+        # Notify external notification service
+        try:
+            notification_payload = {
+                "txn_id": txn.txn_id,
+                "reference": txn.reference,
+                "status": "failed" if failure_status else "success"
+            }
+            requests.post(NOTIFICATION_SERVICE_URL, json=notification_payload, timeout=3)
+        except Exception as notify_err:
+            current_app.logger.warning(f"Notification service call failed for txn_id {txn.txn_id}: {notify_err}")
 
         if failure_status:
             if txn.txn_type == 'transfer':
