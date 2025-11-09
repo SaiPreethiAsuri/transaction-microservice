@@ -278,6 +278,7 @@ def create_transaction():
             for tx in [withdrawal, deposit]:
                 try:
                     notification_payload = {
+                        "customer_id": acc_data.get('customer_id') if tx.txn_type == 'withdrawal' else cp_data.get('customer_id'),
                         "txn_id": tx.txn_id or tx.id,
                         "reference": tx.reference,
                         "status": "success"
