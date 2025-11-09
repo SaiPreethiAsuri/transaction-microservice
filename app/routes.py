@@ -104,7 +104,7 @@ def create_transaction():
     DAILY_LIMIT = 200000
 
     # Fetch external service URLs from environment variables
-    ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-microservice/accounts/check")
+    ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://accounts-microservice/accounts/")
     NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-microservice/notify")
 
     # Minimal required fields
