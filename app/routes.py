@@ -173,13 +173,13 @@ def create_transaction():
             return jsonify({'error': 'account_id and counterparty_id required for transfer'}), 400
 
         # Use ACCOUNTS_SERVICE_URL from env
-        accounts_service_url = ACCOUNTS_SERVICE_URL
+        accounts_check_url = f"{ACCOUNTS_SERVICE_URL.rstrip('/')}/check"
 
         # Validate account/counterparty status and balance (no overdraft allowed)
         try:
             with current_app.balance_check_latency_ms.time():
                 resp = requests.post(
-                    accounts_service_url,
+                    accounts_check_url,
                     json={'account_id': account_id, 'counterparty_id': counterparty_id},
                     timeout=5
                 )
@@ -192,9 +192,9 @@ def create_transaction():
             cp_data = resp_data.get('counterparty', {})
 
             # Validate statuses
-            if acc_data.get('status') == 'frozen' or cp_data.get('status') == 'frozen':
+            if acc_data.get('status') == 'FROZEN' or cp_data.get('status') == 'FROZEN':
                 return jsonify({'error': 'Account or counterparty is frozen'}), 400
-            if acc_data.get('status') != 'active' or cp_data.get('status') != 'active':
+            if acc_data.get('status') != 'ACTIVE' or cp_data.get('status') != 'ACTIVE':
                 return jsonify({'error': 'Account or counterparty is not active'}), 400
 
             # Prevent overdraft
@@ -249,6 +249,31 @@ def create_transaction():
             current_app.transactions_total.labels(txn_type='withdrawal').inc()
             current_app.transactions_total.labels(txn_type='deposit').inc()
 
+            # Update the accounts service 
+            try:
+                update_payload = {
+                  "account_id": account_id,
+                  "counterparty_id": counterparty_id,
+                  "amount": amount,
+                  "txn_type": txn_type
+                }
+                account_update_url= f"{ACCOUNTS_SERVICE_URL.rstrip('/')}/update-balance"
+                
+                balance_resp= requests.post(
+                  account_update_url,
+                  json=update_payload,
+                  timeout=5
+                )
+                if balance_resp.status_code!=200:
+                  return jsonify({
+                    "error":"Balance update failed",
+                    "details":balance_resp.text
+                  }), 502
+            except Exception as e:
+              return jsonify({
+                "error":f"Error contacting account service: {str(e)}"
+              }), 502
+
             # Notify external notification service for both transactions
             for tx in [withdrawal, deposit]:
                 try:
@@ -297,6 +322,31 @@ def create_transaction():
         
         # Business metric: increment total transactions
         current_app.transactions_total.labels(txn_type=txn.txn_type or 'unknown').inc()
+        
+        #Update Account Service Balance
+        try:
+          update_payload = {
+                  "account_id": account_id,
+                  "amount": amount,
+                  "txn_type": txn_type
+          }
+          account_update_url= f"{ACCOUNTS_SERVICE_URL.rstrip('/')}/update-balance"
+                
+          balance_resp= requests.post(
+            account_update_url,
+            json=update_payload,
+            timeout=5
+          )
+          if balance_resp.status_code!=200:
+            return jsonify({
+                    "error":"Balance update failed",
+                    "details":balance_resp.text
+                  }), 502
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Error creating transfer transactions: {str(e)}'}), 500
+          
+        
 
         # Notify external notification service
         try:
